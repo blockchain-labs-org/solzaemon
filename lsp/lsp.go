@@ -35,18 +35,43 @@ func (h *Handler) Handle(ctx context.Context, conn jsonrpc2.JSONRPC2, req *jsonr
 			return nil, err
 		}
 		changed, err := do(params.TextDocument.URI, func() error {
-			h.Mu.Lock()
-			h.Docs[params.TextDocument.URI] = []byte(params.TextDocument.Text)
-			h.Mu.Unlock()
+			h.setDocString(params.TextDocument.URI, params.TextDocument.Text)
 			return nil
 		})
 		if changed {
 			// clear cache
 		}
 		return params.TextDocument.URI, err
+	case "textDocument/didChange":
+		var params protocol.DidChangeTextDocumentParams
+		if err := json.Unmarshal(*req.Params, &params); err != nil {
+			return nil, err
+		}
+		return h.handleTextDocumentDidChange(params)
+	case "textDocument/didClose":
+		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeMethodNotFound, Message: fmt.Sprintf("method not supported: %s", req.Method)}
+	case "textDocument/didSave":
+		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeMethodNotFound, Message: fmt.Sprintf("method not supported: %s", req.Method)}
 	default:
 		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeMethodNotFound, Message: fmt.Sprintf("method not supported: %s", req.Method)}
 	}
+}
+
+func (h *Handler) setDocString(uri protocol.DocumentURI, doc string) {
+	h.setDoc(uri, []byte(doc))
+}
+
+func (h *Handler) setDoc(uri protocol.DocumentURI, doc []byte) {
+	h.Mu.Lock()
+	defer h.Mu.Unlock()
+	h.Docs[uri] = doc
+}
+
+func (h *Handler) getDoc(uri protocol.DocumentURI) ([]byte, bool) {
+	h.Mu.Lock()
+	defer h.Mu.Unlock()
+	doc, found := h.Docs[uri]
+	return doc, found
 }
 
 func do(uri protocol.DocumentURI, op func() error) (bool, error) {
