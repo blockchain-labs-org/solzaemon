@@ -1,34 +1,58 @@
-package main
+package lsp
 
 import (
-	"log"
-	"net/http"
-	"net/rpc"
+	"context"
+	"encoding/json"
+	"fmt"
+	"sync"
 
-	"github.com/powerman/rpc-codec/jsonrpc2"
+	protocol "github.com/sourcegraph/go-langserver/pkg/lsp"
+	"github.com/sourcegraph/jsonrpc2"
 )
 
-type LSPHandler struct{}
-
-type NameArg struct{ Fname, Lname string }
-type NameRes string
-
-// FullName concats first name and last name
-func (*LSPHandler) FullName(t NameArg, res *NameRes) error {
-	*res = NameRes(t.Fname + " " + t.Lname)
-	return nil
+type Handler struct {
+	Mu   sync.Mutex
+	Docs map[protocol.DocumentURI][]byte
 }
 
-func init() {
-	rpc.Register(&LSPHandler{})
+func NewHandler() *Handler {
+	return &Handler{
+		Mu:   sync.Mutex{},
+		Docs: map[protocol.DocumentURI][]byte{},
+	}
 }
 
-func main() {
-	log.Printf("listen :8080")
-	launch(":8080")
+func (h *Handler) Handle(ctx context.Context, conn jsonrpc2.JSONRPC2, req *jsonrpc2.Request) (result interface{}, err error) {
+	defer func() {
+		if perr := recover(); perr != nil {
+			err = fmt.Errorf("%v", perr)
+		}
+	}()
+	switch req.Method {
+	case "textDocument/didOpen":
+		var params protocol.DidOpenTextDocumentParams
+		if err := json.Unmarshal(*req.Params, &params); err != nil {
+			return nil, err
+		}
+		changed, err := do(params.TextDocument.URI, func() error {
+			h.Mu.Lock()
+			h.Docs[params.TextDocument.URI] = []byte(params.TextDocument.Text)
+			h.Mu.Unlock()
+			return nil
+		})
+		if changed {
+			// clear cache
+		}
+		return params.TextDocument.URI, err
+	default:
+		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeMethodNotFound, Message: fmt.Sprintf("method not supported: %s", req.Method)}
+	}
 }
 
-func launch(addr string) {
-	http.Handle("/rpc", jsonrpc2.HTTPHandler(nil))
-	http.ListenAndServe(addr, nil)
+func do(uri protocol.DocumentURI, op func() error) (bool, error) {
+	err := op()
+	if err != nil {
+		return true, err
+	}
+	return false, nil
 }
