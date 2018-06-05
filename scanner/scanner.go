@@ -52,23 +52,26 @@ func (s *Scanner) skipBlank() {
 	}
 }
 
-func (s *Scanner) Scan() (tok token.Token, lit string, err error) {
+func (s *Scanner) Scan() (tok token.Token, lit string) {
+	if s.pos >= len(s.src) {
+		return 0, ""
+	}
 	s.skipBlank()
 	switch ch := s.next(); {
 	case ch == '"':
 		s.backup()
 		tok = token.STRING
-		lit, err = s.scanString()
+		lit = s.scanString()
 		return
 	case isLetter(ch):
 		s.backup()
 		tok = token.IDENT
-		lit, err = s.scanIdent()
+		lit = s.scanIdent()
 		return
 	case isDigit(ch):
 		s.backup()
 		tok = token.INT
-		lit, err = s.scanNumber()
+		lit = s.scanNumber()
 		return
 	case ch == '=':
 		if s.next() == '=' {
@@ -90,16 +93,18 @@ func (s *Scanner) Scan() (tok token.Token, lit string, err error) {
 		}
 	default:
 		tk, ok := tokMap[ch]
-		if !ok {
-			panic("unexpected token: " + string(ch))
+		if ok {
+			tok = tk
+			lit = string(ch)
+		} else {
+			tok = token.ILLEGAL
+			lit = string(ch)
 		}
-		tok = tk
-		lit = string(ch)
 	}
 	return
 }
 
-func (s *Scanner) scanUntilSemicolon() (string, error) {
+func (s *Scanner) scanUntilSemicolon() string {
 	var ret []rune
 	started := false
 done:
@@ -115,11 +120,11 @@ done:
 			ret = append(ret, ch)
 		}
 	}
-	return string(ret), nil
+	return string(ret)
 
 }
 
-func (s *Scanner) scanIdent() (string, error) {
+func (s *Scanner) scanIdent() string {
 	var ret []rune
 	for {
 		ch := s.next()
@@ -129,10 +134,10 @@ func (s *Scanner) scanIdent() (string, error) {
 		}
 		ret = append(ret, ch)
 	}
-	return string(ret), nil
+	return string(ret)
 }
 
-func (s *Scanner) scanString() (string, error) {
+func (s *Scanner) scanString() string {
 	var ret []rune
 	started := false
 done:
@@ -148,10 +153,10 @@ done:
 			ret = append(ret, ch)
 		}
 	}
-	return string(ret), nil
+	return string(ret)
 }
 
-func (s *Scanner) scanNumber() (string, error) {
+func (s *Scanner) scanNumber() string {
 	var ret []rune
 done:
 	for {
@@ -163,7 +168,7 @@ done:
 			break done
 		}
 	}
-	return string(ret), nil
+	return string(ret)
 }
 
 func isBlank(ch rune) bool {

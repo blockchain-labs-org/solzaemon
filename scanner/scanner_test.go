@@ -44,8 +44,7 @@ contract SimpleToken is StandardToken {
 			{token.RBRACE, `}`},
 		}
 		for _, e := range expected {
-			tok, lit, err := s.Scan()
-			assert.Require(t, err == nil)
+			tok, lit := s.Scan()
 			assert.Require(t, lit == e.lit)
 			assert.Require(t, tok == e.tok)
 		}
