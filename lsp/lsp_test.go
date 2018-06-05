@@ -7,6 +7,19 @@ import (
 	protocol "github.com/sourcegraph/go-langserver/pkg/lsp"
 )
 
+func TestHandleTextDocumentDidOpen(t *testing.T) {
+	handler := NewHandler()
+	params := protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:  "code",
+			Text: "func() {}",
+		},
+	}
+	_, err := handler.handleTextDocumentDidOpen(params)
+	assert.Require(t, err == nil)
+	assert.OK(t, string(handler.Docs["code"]) == "func() {}")
+}
+
 func TestHandleTextDocumentDidChange(t *testing.T) {
 	handler := NewHandler()
 	handler.Docs["code"] = []byte(`func A() {

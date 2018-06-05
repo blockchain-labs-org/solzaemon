@@ -7,6 +7,11 @@ import (
 	protocol "github.com/sourcegraph/go-langserver/pkg/lsp"
 )
 
+func (h *Handler) handleTextDocumentDidOpen(params protocol.DidOpenTextDocumentParams) (protocol.DocumentURI, error) {
+	h.setDocString(params.TextDocument.URI, params.TextDocument.Text)
+	return params.TextDocument.URI, nil
+}
+
 func (h *Handler) handleTextDocumentDidChange(params protocol.DidChangeTextDocumentParams) (protocol.DocumentURI, error) {
 	contents, found := h.getDoc(params.TextDocument.URI)
 	if !found {

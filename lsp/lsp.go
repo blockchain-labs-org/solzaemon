@@ -66,14 +66,7 @@ func (h *Handler) Handle(ctx context.Context, conn jsonrpc2.JSONRPC2, req *jsonr
 		if err := json.Unmarshal(*req.Params, &params); err != nil {
 			return nil, err
 		}
-		changed, err := do(params.TextDocument.URI, func() error {
-			h.setDocString(params.TextDocument.URI, params.TextDocument.Text)
-			return nil
-		})
-		if changed {
-			// clear cache
-		}
-		return params.TextDocument.URI, err
+		return h.handleTextDocumentDidOpen(params)
 	case "textDocument/didChange":
 		var params protocol.DidChangeTextDocumentParams
 		if err := json.Unmarshal(*req.Params, &params); err != nil {
