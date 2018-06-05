@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ToQoz/gopwt"
 	"github.com/blockchain-labs-org/solzaemon/lsp"
@@ -35,8 +37,27 @@ func TestMain(m *testing.M) {
 			panic(err)
 		}
 	}()
+	if err := waitServer(addr); err != nil {
+		panic(err)
+	}
 
 	os.Exit(m.Run())
+}
+
+func waitServer(addr string) error {
+	wait := 0
+	for {
+		_, err := (&net.Dialer{}).Dial("tcp", addr)
+		if err == nil {
+			return nil
+		}
+		wait++
+		if wait > 10 {
+			return err
+		}
+		fmt.Println("waiting server...", err)
+		time.Sleep(100 * time.Duration(wait) * time.Millisecond)
+	}
 }
 
 func dialServer(addr string) (*jsonrpc2.Conn, error) {
