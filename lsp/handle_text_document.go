@@ -7,6 +7,11 @@ import (
 	protocol "github.com/sourcegraph/go-langserver/pkg/lsp"
 )
 
+func (h *Handler) handleTextDocumentDefinition(params protocol.TextDocumentPositionParams) ([]protocol.Location, error) {
+	locs := []protocol.Location{}
+	return locs, nil
+}
+
 func (h *Handler) handleTextDocumentDidOpen(params protocol.DidOpenTextDocumentParams) (protocol.DocumentURI, error) {
 	h.setDocString(params.TextDocument.URI, params.TextDocument.Text)
 	return params.TextDocument.URI, nil

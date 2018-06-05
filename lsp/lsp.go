@@ -42,7 +42,11 @@ func (h *Handler) Handle(ctx context.Context, conn jsonrpc2.JSONRPC2, req *jsonr
 	case "textDocument/hover":
 		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeMethodNotFound, Message: fmt.Sprintf("method not supported: %s", req.Method)}
 	case "textDocument/definition":
-		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeMethodNotFound, Message: fmt.Sprintf("method not supported: %s", req.Method)}
+		var params protocol.TextDocumentPositionParams
+		if err := json.Unmarshal(*req.Params, &params); err != nil {
+			return nil, err
+		}
+		return h.handleTextDocumentDefinition(params)
 	case "textDocument/typeDefinition":
 		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeMethodNotFound, Message: fmt.Sprintf("method not supported: %s", req.Method)}
 	case "textDocument/xdefinition":
