@@ -32,7 +32,7 @@ func (h *Handler) handleTextDocumentDidChange(params protocol.DidChangeTextDocum
 			}
 			if !startFound {
 				if (line == sp.Line && col > sp.Character) || line > sp.Line {
-					return params.TextDocument.URI, fmt.Errorf("received textDocument/didChange for invalid start position: %#v on %s", sp, params.TextDocument.URI)
+					return params.TextDocument.URI, fmt.Errorf("received textDocument/didChange for invalid start position %#v on %s", sp, params.TextDocument.URI)
 				}
 				soffset++
 			} else {
@@ -51,7 +51,7 @@ func (h *Handler) handleTextDocumentDidChange(params protocol.DidChangeTextDocum
 					break
 				}
 				if (line == ep.Line && col > ep.Character) || line > ep.Line {
-					return params.TextDocument.URI, fmt.Errorf("received textDocument/didChange for invalid end position: %#v on %s", ep, params.TextDocument.URI)
+					return params.TextDocument.URI, fmt.Errorf("received textDocument/didChange for invalid end position %#v on %s", ep, params.TextDocument.URI)
 				}
 
 				eoffset++
