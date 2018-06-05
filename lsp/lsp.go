@@ -98,11 +98,3 @@ func (h *Handler) getDoc(uri protocol.DocumentURI) ([]byte, bool) {
 	doc, found := h.Docs[uri]
 	return doc, found
 }
-
-func do(uri protocol.DocumentURI, op func() error) (bool, error) {
-	err := op()
-	if err != nil {
-		return true, err
-	}
-	return false, nil
-}
