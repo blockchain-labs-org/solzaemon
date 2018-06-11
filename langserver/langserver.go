@@ -1,4 +1,4 @@
-package lsp
+package langserver
 
 import (
 	"context"

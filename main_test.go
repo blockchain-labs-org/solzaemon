@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/ToQoz/gopwt"
-	"github.com/blockchain-labs-org/solzaemon/lsp"
+	"github.com/blockchain-labs-org/solzaemon/langserver"
 	"github.com/sourcegraph/jsonrpc2"
 )
 
 var (
-	handler *lsp.Handler
+	handler *langserver.Handler
 	addr    string
 )
 
@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 	addr = l.Addr().String()
 	l.Close()
 
-	handler = lsp.NewHandler()
+	handler = langserver.NewHandler()
 	go func() {
 		err := launch(handler, addr)
 		if err != nil {
