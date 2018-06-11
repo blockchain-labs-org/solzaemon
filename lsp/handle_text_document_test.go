@@ -17,13 +17,11 @@ contract SimpleToken is StandardToken {
 	string public constant name = "SimpleToken";
 	string public constant symbol = "SIM";
 	uint8 public constant decimals = 18;
-
 	uint256 public constant INITIAL_SUPPLY = 10000 * (10 ** uint256(decimals));
 
 	constructor() public {
 		totalSupply_ = INITIAL_SUPPLY;
 		balances[msg.sender] = INITIAL_SUPPLY;
-		emit Transfer(0x0, msg.sender, INITIAL_SUPPLY);
 	}
 }`)
 	params := protocol.TextDocumentPositionParams{
@@ -32,15 +30,14 @@ contract SimpleToken is StandardToken {
 		},
 		Position: protocol.Position{
 			Line:      11,
-			Character: 17,
+			Character: 18,
 		},
 	}
 	locs, err := handler.handleTextDocumentDefinition(params)
 	assert.Require(t, err == nil)
 	assert.Require(t, len(locs) == 1)
 	assert.OK(t, locs[0].URI == "code")
-	assert.OK(t, reflect.DeepEqual(locs[0].Range.Start, protocol.Position{Line: 8, Character: 25}))
-	assert.OK(t, reflect.DeepEqual(locs[0].Range.End, protocol.Position{Line: 8, Character: 25}))
+	assert.OK(t, reflect.DeepEqual(locs[0].Range.Start, protocol.Position{Line: 8, Character: 26}))
 }
 
 func TestHandleTextDocumentDidOpen(t *testing.T) {

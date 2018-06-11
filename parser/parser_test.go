@@ -9,7 +9,7 @@ import (
 )
 
 func TestParseERC20SimpleToken(t *testing.T) {
-	got, err := Parse([]rune(`pragma solidity ^0.4.23;
+	got, err := Parse(token.NewFile(), []rune(`pragma solidity ^0.4.23;
 import "../token/ERC20/StandardToken.sol";
 
 contract SimpleToken is StandardToken {

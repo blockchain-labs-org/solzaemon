@@ -20,12 +20,14 @@ var tokMap = map[rune]token.Token{
 
 // Scanner is lexical scanner
 type Scanner struct {
-	src []rune
-	pos int
+	file   *token.File
+	src    []rune
+	pos    int
+	offset token.Pos
 }
 
-func NewScanner(src []rune) *Scanner {
-	return &Scanner{src: src}
+func NewScanner(f *token.File, src []rune) *Scanner {
+	return &Scanner{src: src, file: f}
 }
 
 func (s *Scanner) peek() rune {
@@ -38,12 +40,16 @@ func (s *Scanner) next() rune {
 	}
 
 	ret := s.src[s.pos]
+
+	if ret == '\n' {
+		s.file.AddLine(s.pos)
+	} else {
+		s.file.AddCharacter(s.pos)
+	}
+
+	s.offset++
 	s.pos++
 	return ret
-}
-
-func (s *Scanner) backup() {
-	s.pos--
 }
 
 func (s *Scanner) skipBlank() {
@@ -52,42 +58,42 @@ func (s *Scanner) skipBlank() {
 	}
 }
 
-func (s *Scanner) Scan() (tok token.Token, lit string) {
+func (s *Scanner) Scan() (pos token.Pos, tok token.Token, lit string) {
 	if s.pos >= len(s.src) {
-		return 0, ""
+		return 0, 0, ""
 	}
 	s.skipBlank()
-	switch ch := s.next(); {
+	pos = s.offset
+	switch ch := s.peek(); {
 	case ch == '"':
-		s.backup()
 		tok = token.STRING
 		lit = s.scanString()
 		return
 	case isLetter(ch):
-		s.backup()
 		tok = token.IDENT
 		lit = s.scanIdent()
 		return
 	case isDigit(ch):
-		s.backup()
 		tok = token.INT
 		lit = s.scanNumber()
 		return
 	case ch == '=':
-		if s.next() == '=' {
+		s.next()
+		if s.peek() == '=' {
+			s.next()
 			tok = token.EQ
 			lit = "=="
 		} else {
-			s.backup()
 			tok = token.ASSIGN
 			lit = string(ch)
 		}
 	case ch == '*':
-		if s.next() == '*' {
+		s.next()
+		if s.peek() == '*' {
+			s.next()
 			tok = token.POW
 			lit = "**"
 		} else {
-			s.backup()
 			tok = token.MUL
 			lit = string(ch)
 		}
@@ -100,6 +106,7 @@ func (s *Scanner) Scan() (tok token.Token, lit string) {
 			tok = token.ILLEGAL
 			lit = string(ch)
 		}
+		s.next()
 	}
 	return
 }
@@ -127,11 +134,11 @@ done:
 func (s *Scanner) scanIdent() string {
 	var ret []rune
 	for {
-		ch := s.next()
+		ch := s.peek()
 		if !isLetter(ch) && !isDigit(ch) {
-			s.backup()
 			break
 		}
+		s.next()
 		ret = append(ret, ch)
 	}
 	return string(ret)
@@ -160,11 +167,11 @@ func (s *Scanner) scanNumber() string {
 	var ret []rune
 done:
 	for {
-		switch ch := s.next(); {
+		switch ch := s.peek(); {
 		case isDigit(ch):
+			s.next()
 			ret = append(ret, ch)
 		default:
-			s.backup()
 			break done
 		}
 	}

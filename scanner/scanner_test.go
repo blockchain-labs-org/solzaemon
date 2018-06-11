@@ -10,7 +10,7 @@ import (
 func TestScan(t *testing.T) {
 	{
 		// pragma solidity ^0.4.23
-		s := NewScanner([]rune(`pragma solidity ^0.4.23;
+		s := NewScanner(token.NewFile(), []rune(`pragma solidity ^0.4.23;
 import "../token/ERC20/StandardToken.sol";
 
 contract SimpleToken is StandardToken {
@@ -44,7 +44,7 @@ contract SimpleToken is StandardToken {
 			{token.RBRACE, `}`},
 		}
 		for _, e := range expected {
-			tok, lit := s.Scan()
+			_, tok, lit := s.Scan()
 			assert.Require(t, lit == e.lit)
 			assert.Require(t, tok == e.tok)
 		}

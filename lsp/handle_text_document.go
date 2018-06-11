@@ -4,11 +4,37 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/blockchain-labs-org/solzaemon/parser"
+	"github.com/blockchain-labs-org/solzaemon/token"
 	protocol "github.com/sourcegraph/go-langserver/pkg/lsp"
 )
 
 func (h *Handler) handleTextDocumentDefinition(params protocol.TextDocumentPositionParams) ([]protocol.Location, error) {
-	locs := []protocol.Location{}
+	contents, found := h.getDoc(params.TextDocument.URI)
+	if !found {
+		return nil, fmt.Errorf("received textDocument/definition for unknown file %q", params.TextDocument.URI)
+	}
+
+	f := token.NewFile()
+	p, err := parser.Parse(f, []rune(string(contents)))
+	if err != nil {
+		panic(err) // FIXME
+	}
+
+	d, err := definition(p, token.Pos(f.Offset(params.Position.Line, params.Position.Character)))
+	if err != nil {
+		panic(err)
+	}
+	loc := protocol.Location{
+		URI: "code",
+		Range: protocol.Range{
+			Start: protocol.Position{
+				Line:      f.Line(int(d)),
+				Character: f.Character(int(d)),
+			},
+		},
+	}
+	locs := []protocol.Location{loc}
 	return locs, nil
 }
 

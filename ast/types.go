@@ -25,6 +25,8 @@ type ImportDirective struct {
 }
 
 type ContractPart struct {
+	Name                      *Ident
+	Inherits                  []*Ident
 	StateVariableDeclarations []*StateVariableDeclaration
 	FunctionDefinitions       []*FunctionDefinition
 }
@@ -52,18 +54,22 @@ type Returns struct {
 }
 
 type Ident struct {
-	Name string
+	Name    string
+	NamePos token.Pos
 }
 
 type BinaryExpr struct {
-	X  Expr
-	Op token.Token
-	Y  Expr
+	X     Expr
+	Op    token.Token
+	OpPos token.Pos
+	Y     Expr
 }
 
 type IndexExpr struct {
-	X     Expr
-	Index Expr
+	X      Expr
+	Lbrack token.Pos
+	Index  Expr
+	Rbrack token.Pos
 }
 
 type SelectorExpr struct {
@@ -72,14 +78,15 @@ type SelectorExpr struct {
 }
 
 type ParenExpr struct {
-	Lparen token.Token
+	Lparen token.Pos
 	X      Expr
-	Rparen token.Token
+	Rparen token.Pos
 }
 
 type BasicLit struct {
-	Kind  token.Token
-	Value string
+	Kind     token.Token
+	Value    string
+	ValuePos token.Pos
 }
 
 type AssignStmt struct {
@@ -89,7 +96,7 @@ type AssignStmt struct {
 
 type CallExpr struct {
 	Fun    Expr
-	Lparen token.Token
+	Lparen token.Pos
 	Args   []Expr
-	Rparen token.Token
+	Rparen token.Pos
 }

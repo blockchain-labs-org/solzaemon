@@ -9,16 +9,18 @@ import (
 	protocol "github.com/sourcegraph/go-langserver/pkg/lsp"
 )
 
-func Parse(src []rune) (*ast.Program, error) {
+func Parse(f *token.File, src []rune) (*ast.Program, error) {
 	p := &Parser{}
-	p.scanner = scanner.NewScanner(src)
+	p.scanner = scanner.NewScanner(f, src)
 	p.node = &ast.Program{}
 	return p.parse()
 }
 
 type Parser struct {
+	// DefPos to ReferencePos list
 	scanner *scanner.Scanner
 	node    ast.Node
+	offset  token.Pos
 	tok     token.Token
 	lit     string
 }
@@ -26,7 +28,7 @@ type Parser struct {
 func (p *Parser) parse() (*ast.Program, error) {
 	program := &ast.Program{}
 	for {
-		p.tok, p.lit = p.scanner.Scan()
+		p.next()
 		if p.tok == 0 {
 			break
 		}
@@ -57,32 +59,45 @@ func (p *Parser) parse() (*ast.Program, error) {
 }
 
 func (p *Parser) parsePragma() (*ast.PragmaDirective, error) {
-	p.tok, p.lit = p.scanner.Scan()
+	p.next()
+	name := p.lit
+	p.next()
 	val := ""
 	for {
-		tok, lit := p.scanner.Scan()
-		if tok == token.SEMICOLON {
+		if p.tok == token.SEMICOLON {
 			break
 		}
-		val += lit
+		val += p.lit
+		p.next()
 	}
 	return &ast.PragmaDirective{
-		Name:  &ast.Ident{Name: p.lit},
+		Name:  &ast.Ident{Name: name, NamePos: p.offset},
 		Value: val,
 	}, nil
 }
 
 func (p *Parser) parseImport() (*ast.ImportDirective, error) {
-	p.tok, p.lit = p.scanner.Scan()
+	p.next()
 	return &ast.ImportDirective{Path: protocol.DocumentURI(p.lit)}, nil
 }
 
 func (p *Parser) parseContract() (*ast.ContractPart, error) {
 	part := &ast.ContractPart{}
-	_, _ = p.scanner.Scan()
-	_, _ = p.scanner.Scan()
-	_, _ = p.scanner.Scan()
-	_, _ = p.scanner.Scan()
+	p.next()
+	p.expect(token.IDENT)
+	part.Name = p.parseIdent()
+
+	if p.tok == token.IDENT && p.lit == "is" {
+		p.next()
+		for {
+			part.Inherits = append(part.Inherits, &ast.Ident{Name: p.lit, NamePos: p.offset})
+			p.next()
+			if p.tok != token.COMMA {
+				break
+			}
+		}
+	}
+	p.expect(token.LBRACE)
 
 	for {
 		p.next()
@@ -91,9 +106,11 @@ func (p *Parser) parseContract() (*ast.ContractPart, error) {
 		}
 
 		switch p.tok {
+		case token.RBRACE:
+			return part, nil
 		case token.IDENT:
 			switch p.lit {
-			case "constructor", "func":
+			case "constructor", "function":
 				fn, err := p.parseFunction()
 				if err != nil {
 					return nil, err
@@ -113,7 +130,7 @@ func (p *Parser) parseContract() (*ast.ContractPart, error) {
 
 func (p *Parser) parseStateVariable() (*ast.StateVariableDeclaration, error) {
 	stateVar := &ast.StateVariableDeclaration{}
-	stateVar.Typ = &ast.Ident{Name: p.lit}
+	stateVar.Typ = &ast.Ident{Name: p.lit, NamePos: p.offset}
 
 done:
 	for {
@@ -126,7 +143,7 @@ done:
 			case "public", "internal", "private":
 				stateVar.Visibility = p.lit
 			default:
-				stateVar.Name = &ast.Ident{Name: p.lit}
+				stateVar.Name = &ast.Ident{Name: p.lit, NamePos: p.offset}
 				break done
 			}
 		}
@@ -142,7 +159,7 @@ done:
 }
 
 func (p *Parser) next() {
-	p.tok, p.lit = p.scanner.Scan()
+	p.offset, p.tok, p.lit = p.scanner.Scan()
 }
 
 func (p *Parser) parseFunction() (*ast.FunctionDefinition, error) {
@@ -150,12 +167,12 @@ func (p *Parser) parseFunction() (*ast.FunctionDefinition, error) {
 	if p.lit != "constructor" {
 		p.next()
 	}
-	functionDef.Name = &ast.Ident{Name: p.lit}
+	functionDef.Name = &ast.Ident{Name: p.lit, NamePos: p.offset}
 	p.expectNext(token.LPAREN)
 	// NOTE: args is not supported yet
 	p.expectNext(token.RPAREN)
 
-	p.tok, p.lit = p.scanner.Scan()
+	p.next()
 	if p.tok == token.IDENT {
 		if p.lit == "public" || p.lit == "internal" || p.lit == "private" {
 			functionDef.Visibility = p.lit
@@ -202,13 +219,16 @@ func (p *Parser) parseBinaryExpr() ast.Expr {
 		}
 		switch p.tok {
 		case token.ASSIGN, token.ADD, token.MUL, token.POW:
-			op := p.tok // save tok for op
+			// save tok/pos for op
+			op := p.tok
+			opPos := p.offset
 			p.next()
 			y := p.parseBinaryExpr()
 			x = &ast.BinaryExpr{
-				X:  x,
-				Op: op,
-				Y:  y,
+				X:     x,
+				Op:    op,
+				OpPos: opPos,
+				Y:     y,
 			}
 		default:
 			return x
@@ -242,13 +262,15 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 func (p *Parser) parseCallOrConversion(x ast.Expr) ast.Expr {
 	var args []ast.Expr
 	p.expect(token.LPAREN)
+	lparen := p.offset
 	p.next()
 	for p.tok != token.RPAREN && p.tok != 0 {
 		args = append(args, p.parseUnaryExpr())
 		p.next()
 	}
 	p.expect(token.RPAREN)
-	return &ast.CallExpr{Fun: x, Lparen: token.LPAREN, Args: args, Rparen: token.RPAREN}
+	rparen := p.offset
+	return &ast.CallExpr{Fun: x, Lparen: lparen, Args: args, Rparen: rparen}
 }
 
 func (p *Parser) parseSelector(x ast.Expr) ast.Expr {
@@ -259,11 +281,16 @@ func (p *Parser) parseSelector(x ast.Expr) ast.Expr {
 func (p *Parser) parseIndexExpr(x ast.Expr) ast.Expr {
 	idxExpr := &ast.IndexExpr{}
 	idxExpr.X = x
+
 	p.expect(token.LBRACK)
+	idxExpr.Rbrack = p.offset
 	p.next()
 	idxExpr.Index = p.parseBinaryExpr()
+
 	p.expect(token.RBRACK)
+	idxExpr.Rbrack = p.offset
 	p.next()
+
 	return idxExpr
 }
 
@@ -276,23 +303,24 @@ func (p *Parser) parseOperand() ast.Expr {
 	case token.LPAREN:
 		p.next()
 		x := p.parseBinaryExpr()
-		rparen, _ := p.expect(token.RPAREN)
+		p.expect(token.RPAREN)
+		rparen := p.offset
 		p.next()
-		return &ast.ParenExpr{Lparen: p.tok, X: x, Rparen: rparen}
+		return &ast.ParenExpr{Lparen: p.offset, X: x, Rparen: rparen}
 	case token.RBRACE: // hotfix
 		return nil
 	}
 	panic("parseOperand: BadExpr: " + string(p.tok) + p.lit)
 }
 
-func (p *Parser) parseIdent() ast.Expr {
-	name := &ast.Ident{Name: p.lit}
+func (p *Parser) parseIdent() *ast.Ident {
+	name := &ast.Ident{Name: p.lit, NamePos: p.offset}
 	p.next()
 	return name
 }
 
 func (p *Parser) parseBasicLit() ast.Expr {
-	lit := &ast.BasicLit{Kind: p.tok, Value: p.lit}
+	lit := &ast.BasicLit{Kind: p.tok, Value: p.lit, ValuePos: p.offset}
 	p.next()
 	return lit
 }
